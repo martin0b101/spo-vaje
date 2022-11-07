@@ -29,17 +29,21 @@ int delete_n_line(int* file, int* line_number){
     int start_place;
     int end_place;
     int bytes_read;
+    printf("File desc in d: %d\n", file);
     while ((bytes_read = read(file, buffer, BUFFER_SIZE)) > 0){
-        printf("Bytes read %d\n", bytes_read);
         for (int i = 0; i < bytes_read; i++)
         {
-            printf("%s", buffer);
             if (buffer[i] == '\n')
             {
                 printf("\n\nFound new line on byte %d\n\n", i);
             }
         }
     }
+    
+    if (bytes_read == -1){
+        perror("Error reading: ");
+    }
+    printf("Bytes read %d", bytes_read);
     return 0;
 }
 
@@ -48,20 +52,26 @@ int main(int argc, char *argv[]){
     if (argc > 4)
         printf("Error: to much arguments!\n");
     if (argc < 3)
-        printf("Error: to much arguments!\n");
+        printf("Error: to few arguments!\n");
 
     
     //open file for writing
-    int file = open(argv[1], O_WRONLY | O_APPEND | O_RDONLY);
+    //printf("File desc o: %d\n", file);
     //append
     if (argv[2][0] == 'a')
     {
+        int file = open(argv[1], O_WRONLY | O_APPEND | O_RDONLY);
         append_text(file);
+        if (close(file) > 0)
+            perror("Can't close the file: ");
         /* code */
     }else if(argv[2][0] == 'd'){
         //delete 
+        int file = open(argv[1], O_RDONLY);
         printf("delete\n");
         int n = atoi(argv[3]);
+        int bytes_read = 0;
+        char buffer[BUFFER_SIZE];        
         delete_n_line(file, n);
 
     }else if(argv[2][0] == 'i'){
