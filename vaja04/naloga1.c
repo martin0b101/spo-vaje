@@ -9,29 +9,56 @@
 #define BUFFER_SIZE 1000
 
 //Writes data from stanadrd input to file.
-int append_text(char* filename){
-    FILE* file;
-    file = fopen(filename, "a");
-    int bytes_read = 0;
-    char buffer[BUFFER_SIZE];
-    while ((bytes_read = read(STDIN_FILENO, buffer, BUFFER_SIZE)) > 0)
-    {
-        printf("Bytes read %d", bytes_read);
-        fputc(bytes_read, file);
+int append_text(FILE* file){
+    char buf[BUFFER_SIZE];
+    printf("Write code: \n");
+    while (fgets(buf, sizeof buf, stdin) && buf[0] != '\n') {
+        fputs(buf, file);
     }
-    fputs(buffer, file);
-    if (bytes_read < 0)
-    {
-        perror("Napaka branja: ");
-    }
-    fclose(filename);
-    
+    fclose(file);
     return 0;
 }
 
 //Deletes line on number n.
-int delete_n_line(FILE* file, int* line_number){
+int delete_n_line(char* file_name, int* line_number){
+    char line[BUFFER_SIZE];
+    FILE* file = fopen(file_name, "r");
+    FILE* temp = fopen("temp", "w");
+    int counter = 1;
+    char buff[BUFFER_SIZE];
+    while(!feof(file)) {
+        fgets(line, BUFFER_SIZE, file);
+        if (counter != line_number){
+            fputs(line, temp);
+        }
+        counter++;
+    }
+    remove(file_name);
+    fclose(temp);
+    fclose(file);
+    rename("temp", file_name);
+    return 0; 
 
+}
+
+int insert_on_nth_line(char* file_name, int* line_number){
+    char line[BUFFER_SIZE];
+    FILE* file = fopen(file_name, "r");
+    FILE* temp = fopen("temp", "w");
+    int counter = 1;
+    char buff[BUFFER_SIZE];
+    while(!feof(file)) {
+        fgets(line, BUFFER_SIZE, file);
+        if (counter == line_number){
+            fputs("\n", temp);
+        }
+        fputs(line, temp);
+        counter++;
+    }
+    remove(file_name);
+    fclose(temp);
+    fclose(file);
+    rename("temp", file_name);
     return 0;
 }
 
@@ -43,26 +70,25 @@ int main(int argc, char *argv[]){
         printf("Error: to few arguments!\n");
 
     
-    FILE *file;
 
     //printf("File desc o: %d\n", file);
     //append
     if (argv[2][0] == 'a')
     {
-        printf("Writing:\n");
-        append_text(argv[1]);
-        //fclose(file);
-        /* code */
+        FILE* file = fopen(argv[1], "a+");
+        append_text(file);
+
     }else if(argv[2][0] == 'd'){
         //delete 
-        /*file = fopen(argv[1], "r");
+        //FILE* file = fopen(argv[1], "r");
         printf("delete\n");
         int n = atoi(argv[3]);
-        delete_n_line(file, n);
-        fclose(file);*/
+        delete_n_line(argv[1], n);
 
     }else if(argv[2][0] == 'i'){
         //insert
+        int n = atoi(argv[3]);
+        insert_on_nth_line(argv[1], n);
     }else{
         printf("Wrong arguments!\n");
     }
