@@ -1,109 +1,101 @@
-
 #include <unistd.h>
 #include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <stdlib.h>
-#include <stdbool.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <signal.h>
 
-#define BUFFER_SIZE 1000
+#define err_sys(mess) { fprintf(stderr,"Error: %s.", mess); exit(1); }
+#define MAXLINE 512
 
-//Writes data from stanadrd input to file.
-int append_text(FILE* file){
-    char buf[BUFFER_SIZE];
-    printf("Write code: \n");
-    while (fgets(buf, sizeof buf, stdin) && buf[0] != '\n') {
-        fputs(buf, file);
-    }
-    fclose(file);
-    return 0;
-}
+struct args {
+  char **args;
+  int argc;
+};
 
-//Deletes line on number n.
-int delete_n_line(char* file_name, int* line_number){
-    char line[BUFFER_SIZE];
-    FILE* file = fopen(file_name, "r");
-    FILE* temp = fopen("temp", "w");
-    int line_counter = 1;
-    char buff[BUFFER_SIZE];
-    bool read = true;
+int sigint_counter = 0;
 
-    do{
-        fgets(line, BUFFER_SIZE, file);
-        if (feof(file))
-            read = false;
-        else if(line_counter != line_number)
-            fputs(line, temp);
-
-        line_counter++;
-    }while(read);
-
-    fclose(temp);
-    fclose(file);
-    remove(file_name);
-    rename("temp", file_name);
-    return 0; 
-
-}
-
-int insert_on_nth_line(char* file_name, int* line_number, char* newline_content){
-    char line[BUFFER_SIZE];
-    FILE* file = fopen(file_name, "r");
-    FILE* temp = fopen("temp", "w");
-    int line_counter = 1;
-    char buff[BUFFER_SIZE];
-    bool read = true;
-
-    do{
-        fgets(line, BUFFER_SIZE, file);
-        if (feof(file))
-            read = false;
-        if(line_counter == line_number){
-            fputs(newline_content, temp);
-            fputs(line, temp);
-        }else{
-            fputs(line, temp);
+struct args* parse_arguments(char* line){
+    char** args;
+    args = malloc(MAXLINE*sizeof(char*));
+    int counter = 0;
+    int new_arg_started = 0;
+    int in_len = strlen(line);
+    for (int i = 0; i < in_len && i < MAXLINE-1; i++) {
+        if (line[i] == '\n') {
+            line[i] = 0;
+            break;
+        } else if (line[i] == ' ') {
+            if (!new_arg_started) { /* Do nothing (dupliciran space) */ }
+            new_arg_started = 0;
+            line[i] = 0;
+        } else {
+            // vsebina!
+            if (!new_arg_started) {
+                counter++; // nova vsebina
+                args[counter-1] = &line[i];
+            }
+            new_arg_started = 1;
         }
-        line_counter++;
-        
-    }while(read);
-    fclose(temp);
-    fclose(file);
-    remove(file_name);
-    rename("temp", file_name);
-    return 0;
+    }
+    args[counter+1] = NULL;
+    //printf("im outside of while lop\n");
+    struct args *arguments = malloc(sizeof(struct args));
+    arguments->args = args;
+    arguments->argc = counter;
+
+    return arguments;
 }
 
-int main(int argc, char *argv[]){
 
-    if (argc > 4)
-        printf("Error: to much arguments!\n");
-    if (argc < 3)
-        printf("Error: to few arguments!\n");
-    //append
-    if (argv[2][0] == 'a')
+void sig_handler(int signo)
+{
+    if (sigint_counter)
     {
-        FILE* file = fopen(argv[1], "a+");
-        append_text(file);
-
-    }else if(argv[2][0] == 'd'){
-        //delete 
-        //FILE* file = fopen(argv[1], "r");
-        printf("delete\n");
-        int n = atoi(argv[3]);
-        delete_n_line(argv[1], n);
-
-    }else if(argv[2][0] == 'i'){
-        //insert
-        char newline[BUFFER_SIZE];
-        printf("insert line: ");
-        int n = atoi(argv[3]);
-        fgets(newline, BUFFER_SIZE, stdin);
-        insert_on_nth_line(argv[1], n, newline);
-    }else{
-        printf("Wrong arguments!\n");
+        printf("\nNasvidenje!\n");
+        exit(0);
     }
+    printf(">\n For exit press CTRL+C again in 3 sec.\n");
+    sigint_counter++;
+    alarm(3);
+}
 
-    return 0;
+void alarm_handler(int signo){
+    sigint_counter = 0;
+    printf("> ");
+    fflush(stdout);
+}
+
+int main()
+{
+    
+    signal(SIGALRM, alarm_handler);
+    signal(SIGINT, sig_handler);
+	char buf[MAXLINE];
+	pid_t pid;
+	int status;
+	printf("> "); // izpiše prompt %
+    struct args *argument_list;
+	while (fgets(buf, MAXLINE, stdin) != NULL)
+	{
+        
+        buf[strlen(buf) - 1] = 0; // spremeni znak za novo vrstico v ničti znak
+        argument_list = parse_arguments(buf);
+        if ( (pid = fork()) < 0)
+			err_sys("fork error")
+		else if (pid == 0) { // otrok
+            char **commands = argument_list->args;
+            int code = execvp(commands[0], commands);
+
+			printf("couldn't execute: %s", buf);
+            free(argument_list);
+			exit(127);
+		}
+		// starš
+		if ( (pid = waitpid(pid, &status, 0)) < 0)
+			err_sys("waitpid error")
+		printf("> ");
+	}
+
+	exit(0);
 }
